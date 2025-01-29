@@ -1,0 +1,122 @@
+﻿@page "/"
+@layout Layout.LoginLayout
+
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject NavigationManager Navigation
+
+@using System.Text.Json
+<div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #ecf0f1 0%, #f5f7fa 100%);
+; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <div style="width: 360px; padding: 40px; border-radius: 12px; border: 1px solid rgba(52, 152, 219, 0.4); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+;
+x rgba(0, 0, 0, 0.15); background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(10px);">
+        <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="font-size: 1.5rem; color: #2c3e50; font-weight: 600; margin-bottom: 10px;">Welcome Back</h1>
+            <p style="font-size: 1rem; color: #34495e;">Sign in to continue managing your finances with MoneyMinder</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div style="background-color: rgba(231, 76, 60, 0.2); color: #e74c3c; text-align: center; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9rem; border: 1px solid rgba(231, 76, 60, 0.3);">
+                <p>@ErrorMessage</p>
+            </div>
+        }
+
+        <form @onsubmit="HandleLogin" style="display: flex; flex-direction: column; gap: 20px;">
+            <div>
+                <label for="password" style="font-size: 0.9rem; color: #2c3e50; margin-bottom: 8px; display: block; font-weight: 500;">
+                    Password
+                </label>
+                <input id="password" type="password" placeholder="Enter your password"
+                       style="width: 100%; padding: 12px; border: 1px solid rgba(52, 152, 219, 0.4); border-radius: 8px; font-size: 1rem; background: rgba(255, 255, 255, 0.15); color: #2c3e50; transition: border-color 0.3s;"
+                       @bind="Password"
+                       onfocus="this.style.borderColor='#3498db';"
+                       onblur="this.style.borderColor='rgba(52, 152, 219, 0.4)';" />
+            </div>
+
+            <button type="submit"
+                    style="padding: 14px; background: linear-gradient(90deg, #3498db, #2980b9); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.3s;"
+                    onmouseover="this.style.boxShadow='0px 5px 15px rgba(52, 152, 219, 0.4)';"
+                    onmouseout="this.style.boxShadow='none';">
+                Login
+            </button>
+        </form>
+
+       
+        </div>
+    </div>
+
+
+
+@code {
+    public string Password { get; set; } = string.Empty;
+    public string ErrorMessage { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var isSignedUp = await LocalStorage.GetItemAsync<bool>("SignedUp");
+
+            if (!isSignedUp)
+            {
+                Navigation.NavigateTo("/signup");
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error loading signup status: {ex.Message}";
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        try
+        {
+            // Clear any previous error message
+            ErrorMessage = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(Password))
+            {
+                ErrorMessage = "Password cannot be empty.";
+                return;
+            }
+
+            // Retrieve user details from local storage
+            var userDetails = await LocalStorage.GetItemAsync<string>("Details");
+
+            if (!string.IsNullOrEmpty(userDetails))
+            {
+                var savedUser = JsonSerializer.Deserialize<JsonElement>(userDetails);
+
+                // Validate if 'Password' property exists in savedUser
+                if (savedUser.TryGetProperty("Password", out var storedPasswordElement))
+                {
+                    var storedPassword = storedPasswordElement.GetString();
+
+                    if (!string.IsNullOrEmpty(storedPassword) && storedPassword.Trim() == Password.Trim())
+                    {
+                        // Redirect to dashboard if password matches
+                        Navigation.NavigateTo("/dashboard");
+                    }
+                    else
+                    {
+                        ErrorMessage = "Invalid password. Please try again.";
+                    }
+                }
+                else
+                {
+                    ErrorMessage = "Invalid user data. Please sign up again.";
+                }
+            }
+            else
+            {
+                ErrorMessage = "No user details found. Please sign up.";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error during login: {ex.Message}";
+        }
+    }
+}

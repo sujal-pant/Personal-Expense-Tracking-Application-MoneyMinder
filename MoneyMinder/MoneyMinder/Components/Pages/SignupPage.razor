@@ -1,0 +1,109 @@
+﻿@page "/signup"
+@layout Layout.LoginLayout
+
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject NavigationManager Navigation
+
+<div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f5f7fa;">
+    <div style="width: 400px; background: #ffffff; padding: 40px; border-radius: 12px; box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.1);">
+        <div style="text-align: center; margin-bottom: 25px;">
+            <h1 style="font-size: 2rem; color: #333; font-weight: 700; margin-bottom: 10px;">Welcome to MoneyMinder</h1>
+            <p style="font-size: 1rem; color: #777;">Set up your account to get started</p>
+        </div>
+
+        <form @onsubmit="HandleSignUp" style="display: flex; flex-direction: column;">
+            <!-- Username Field -->
+            <div style="margin-bottom: 20px;">
+                <label for="username" style="font-size: 0.9rem; color: #444; margin-bottom: 5px; display: block;">Username</label>
+                <input id="username" type="text" placeholder="Enter username"
+                       style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; outline: none; transition: border-color 0.2s;"
+                       @bind="Username" />
+            </div>
+
+            <!-- Password Field -->
+            <div style="margin-bottom: 20px;">
+                <label for="password" style="font-size: 0.9rem; color: #444; margin-bottom: 5px; display: block;">Password</label>
+                <input id="password" type="password" placeholder="Enter password"
+                       style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; outline: none; transition: border-color 0.2s;"
+                       @bind="Password" />
+            </div>
+
+            <!-- Currency Field -->
+            <select id="currency"
+                    style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; outline: none; transition: border-color 0.2s;"
+                    @bind="PreferredCurrency">
+                <option value="" disabled selected>Choose a currency</option>
+                <option value="₹">INR</option>
+                <option value="$">USD</option>
+                <option value="Rs">NPR</option>
+                <option value="€">EURO</option>
+            </select>
+
+            <!-- Submit Button -->
+            <button type="submit"
+                    style="padding: 14px; background: linear-gradient(90deg, #4CAF50, #81C784); color: white; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: transform 0.2s, background-color 0.3s;">
+                Save and Login
+            </button>
+        </form>
+    </div>
+</div>
+
+<style>
+    /* Input and select field focus effect */
+    input:focus, select:focus {
+        border-color: #4CAF50;
+        outline: none;
+    }
+
+    /* Button hover effect */
+    button:hover {
+        transform: scale(1.05);
+        background-color: #66BB6A;
+    }
+</style>
+
+@code {
+    // Define the UserDetails class directly within this component
+    public class UserDetails
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string PreferredCurrency { get; set; } = string.Empty;
+    }
+
+    // Bindings for user input
+    public string Username { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public string PreferredCurrency { get; set; } = string.Empty;
+
+    // Handle signup logic
+    private async Task HandleSignUp()
+    {
+        // Ensure all fields are filled
+        if (string.IsNullOrEmpty(Username) || string.IsNullOrEmpty(Password))
+        {
+            Console.WriteLine("Username and password cannot be empty.");
+            return;  // Handle the error appropriately
+        }
+
+        // Create a UserDetails object to store user details
+        var userDetails = new UserDetails
+            {
+                Username = Username,
+                Password = Password,
+                PreferredCurrency = PreferredCurrency
+            };
+
+        // Convert the object to JSON
+        var json = System.Text.Json.JsonSerializer.Serialize(userDetails);
+
+        // Store user details in local storage
+        await LocalStorage.SetItemAsync("Details", json);
+
+        // Mark the user as signed up
+        await LocalStorage.SetItemAsync("SignedUp", true);
+
+        // Redirect to the dashboard after signup
+        Navigation.NavigateTo("/dashboard");
+    }
+}

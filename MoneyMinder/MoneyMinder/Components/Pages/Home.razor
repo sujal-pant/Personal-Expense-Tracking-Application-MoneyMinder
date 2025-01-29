@@ -1,0 +1,558 @@
+﻿@page "/dashboard"
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@using System.Text.Json;
+@using static MoneyMinder.Components.Pages.SignupPage
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+
+<div class="dashboard-container">
+    <header class="dashboard-header">
+        <h1>Financial Dashboard</h1>
+    </header>
+
+    <section class="actions">
+        <button @onclick="DeleteAccount" class="delete-button">Delete Account</button>
+    </section>
+
+    <section class="summary-cards">
+        <div class="card" style="background: #e0f7fa;">
+            <i class="fas fa-coins"></i>
+            <h3>Total Inflows</h3>
+            <p>@UserCurrency @TotalInflows</p>
+        </div>
+        <div class="card" style="background: #ffcdd2;">
+            <i class="fas fa-money-check-alt"></i>
+            <h3>Total Outflows</h3>
+            <p>@UserCurrency@TotalOutflows</p>
+        </div>
+        <div class="card" style="background: #c8e6c9;">
+            <i class="fas fa-wallet"></i>
+            <h3>Available Balance</h3>
+            <p>@UserCurrency@AvailableBalance</p>
+        </div>
+        <div class="card" style="background: #bbdefb;">
+            <i class="fas fa-hourglass-half"></i>
+            <h3>Current Debt Amount</h3>
+            <p>@UserCurrency@PendingDebt</p>
+        </div>
+        <div class="card" style="background: #dcedc8;">
+            <i class="fas fa-check-circle"></i>
+            <h3>Cleared Debt</h3>
+            <p>@ClearedDebt</p>
+        </div>
+        <div class="card" style="background: #f5f5f5;">
+            <i class="fas fa-exchange-alt"></i>
+            <h3>Total System Transactions</h3>
+            <p>@TotalTransactions</p>
+        </div>
+    </section>
+
+    <h2>Highest/Lowest Inflow, Outflow, and Debt Transactions</h2>
+    <MudPaper Class="pa-4 mt-4">
+        <MudChart ChartType="ChartType.Bar"
+                  ChartSeries="@Series"
+                  XAxisLabels="@XAxisLabels"
+                  Width="100%"
+                  Height="350px">
+        </MudChart>
+    </MudPaper>
+
+    <section class="data-section">
+        <h3>Pending Debts</h3>
+        @if (PendingDebts.Any())
+        {
+            <table class="data-table pending-debts">
+                <thead>
+                    <tr>
+                        <th>Debt Source</th>
+                        <th>Amount</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var debt in PendingDebts)
+                    {
+                        <tr>
+                            <td>@debt.DebtSource</td>
+                            <td>@UserCurrency@debt.DebtAmount</td>
+                            <td>@debt.DueDate.ToString("d")</td>
+                            <td class="status-pending">Pending</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p>No pending debts.</p>
+        }
+    </section>
+
+    <section class="data-section">
+        <h2>Cleared Debts</h2>
+        @if (ClearedDebts.Any())
+        {
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Debt Source</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var debt in ClearedDebts)
+                    {
+                        <tr>
+                            <td>@debt.DebtSource</td>
+                            <td>@debt.DueDate.ToString("d")</td>
+                            <td class="status-cleared">Cleared</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p>No cleared debts.</p>
+        }
+    </section>
+
+    <section class="data-section">
+        <h2>Top 5 Cash Inflows</h2>
+        @if (Inflows.Any())
+        {
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var inflow in Inflows.OrderByDescending(i => i.Amount).Take(5))
+                    {
+                        <tr>
+                            <td>@inflow.Title</td>
+                            <td>@UserCurrency@inflow.Amount</td>
+                            <td>@inflow.Date.ToString("d")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p>No cash inflows recorded yet.</p>
+        }
+    </section>
+
+
+    <section class="data-section">
+        <h2>Top 5 Cash Outflows</h2>
+        @if (Outflows.Any())
+        {
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var outflow in Outflows.OrderByDescending(o => o.Amount).Take(5))
+                    {
+                        <tr>
+                            <td>@outflow.Title</td>
+                            <td>@UserCurrency@outflow.Amount</td>
+                            <td>@outflow.Date.ToString("d")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p>No cash outflows recorded yet.</p>
+        }
+    </section>
+
+</div>
+
+<style>
+    .dashboard-container {
+        font-family: 'Roboto', sans-serif;
+        background: #f4f7fc;
+        padding: 15px;
+        margin: auto;
+        max-width: 1100px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .dashboard-header {
+        text-align: center;
+        margin-bottom: 20px;
+        color: #333;
+    }
+
+        .dashboard-header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+    .actions {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .delete-button {
+        background: #f44336;
+        border: none;
+        border-radius: 6px;
+        color: white;
+        font-size: 0.8rem;
+        padding: 8px 16px;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+    }
+
+        .delete-button:hover {
+            transform: scale(1.05);
+        }
+
+    .summary-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: white;
+        border-radius: 10px;
+        padding: 12px;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.05);
+        text-align: center;
+    }
+
+        .card i {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+        }
+
+        .card h3 {
+            font-size: 1rem;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+    .data-section {
+        margin-bottom: 25px;
+    }
+
+        .data-section h2 {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            color: #444;
+        }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    }
+
+        .data-table th, .data-table td {
+            padding: 8px;
+            border: 1px solid #ddd;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        .data-table th {
+            background: #90caf9;
+            color: white;
+        }
+
+        .data-table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .data-table tr:nth-child(odd) {
+            background: #f1f1f1;
+        }
+
+        .data-table tr:hover {
+            background-color: #e3f2fd;
+        }
+
+    .status-pending {
+        color: #d32f2f;
+        font-weight: bold;
+    }
+
+    .status-cleared {
+        color: #388e3c;
+        font-weight: bold;
+    }
+
+    .pending-debts {
+        border: 2px solid #f44336;
+        border-radius: 10px;
+        background: linear-gradient(145deg, #ffebee, #ffcdd2);
+        padding: 12px;
+    }
+
+        .pending-debts thead {
+            background-color: #f44336;
+            color: white;
+            font-weight: 500;
+        }
+
+        .pending-debts tbody tr:nth-child(even) {
+            background-color: #ffe6e6;
+        }
+
+        .pending-debts tbody tr:nth-child(odd) {
+            background-color: #ffcccc;
+        }
+
+        .pending-debts tbody tr:hover {
+            background-color: #f44336;
+            color: #fff;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .pending-debts .status-pending {
+            text-transform: uppercase;
+        }
+</style>
+
+@code {
+    private List<ChartSeries> Series = new List<ChartSeries>();
+    private string[] XAxisLabels = { "Inflow", "Outflow", "Debt" };
+    private decimal TotalInflows { get; set; }
+    private decimal TotalOutflows { get; set; }
+    private decimal AvailableBalance { get; set; }
+    private decimal TotalDebt { get; set; }
+    private decimal PendingDebt { get; set; }
+    private decimal ClearedDebt { get; set; }
+    private decimal HighestInflow { get; set; }
+    private decimal LowestInflow { get; set; }
+    private decimal HighestOutflow { get; set; }
+    private decimal LowestOutflow { get; set; }
+    private decimal HighestDebt { get; set; }
+    private decimal LowestDebt { get; set; }
+    private int TotalTransactions { get; set; }
+    private decimal NetTotal { get; set; }
+    private decimal TotalTransactions1 { get; set; }
+    private string UserCurrency { get; set; } = string.Empty;
+
+    private List<Debt> Debts { get; set; } = new List<Debt>();
+    private List<Transaction> Inflows { get; set; } = new List<Transaction>();
+    private List<Transaction> Outflows { get; set; } = new List<Transaction>();
+
+    private string InflowFilePath = Path.Combine(AppContext.BaseDirectory, "cash_inflows.json");
+    private string OutflowFilePath = Path.Combine(AppContext.BaseDirectory, "cash_outflows.json");
+    private string DebtFilePath = Path.Combine(AppContext.BaseDirectory, "debts.json");
+
+    private List<Debt> PendingDebts => Debts.Where(d => d.DebtAmount > 0).ToList();
+    private List<Debt> ClearedDebts => Debts.Where(d => d.DebtAmount == 0).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Debts = await LoadDebtsFromJson();
+        Inflows = await LoadTransactionsFromJson(InflowFilePath);
+        Outflows = await LoadTransactionsFromJson(OutflowFilePath);
+        await LoadUserCurrency();
+        RecalculateDashboard();
+        UpdateChartData();
+
+    }
+    private async Task LoadUserCurrency()
+    {
+        var userDetailsJson = await LocalStorage.GetItemAsync<string>("Details");
+        if (!string.IsNullOrEmpty(userDetailsJson))
+        {
+            var userDetails = System.Text.Json.JsonSerializer.Deserialize<UserDetails>(userDetailsJson);
+            UserCurrency = userDetails?.PreferredCurrency ?? "USD";
+        }
+        else
+        {
+            UserCurrency = "USD";  // Default to USD if no details are found
+        }
+    }
+
+    private void UpdateChartData()
+    {
+        Series = new List<ChartSeries>
+        {
+            new ChartSeries
+            {
+                Name = "Highest",
+                Data = new double[]
+                {
+                    (double)HighestInflow,
+                    (double)HighestOutflow,
+                    (double)HighestDebt
+                }
+            },
+            new ChartSeries
+            {
+                Name = "Lowest",
+                Data = new double[]
+                {
+                    (double)LowestInflow,
+                    (double)LowestOutflow,
+                    (double)LowestDebt
+                }
+            }
+        };
+    }
+    private void RecalculateDashboard()
+    {
+        TotalInflows = Inflows.Sum(t => t.Amount);
+        TotalOutflows = Outflows.Sum(t => t.Amount);
+        TotalDebt = Debts.Sum(d => d.DebtAmount);
+        PendingDebt = Debts.Where(d => d.DebtAmount > 0).Sum(d => d.DebtAmount);
+        ClearedDebt = Debts.Count(d => d.DebtAmount == 0); // Updated to count cleared debts
+        HighestInflow = Inflows.Any() ? Inflows.Max(i => i.Amount) : 0;
+        LowestInflow = Inflows.Any() ? Inflows.Min(i => i.Amount) : 0;
+        HighestOutflow = Outflows.Any() ? Outflows.Max(o => o.Amount) : 0;
+        LowestOutflow = Outflows.Any() ? Outflows.Min(o => o.Amount) : 0;
+        HighestDebt = Debts.Any() ? Debts.Max(d => d.DebtAmount) : 0;
+        LowestDebt = Debts.Any() ? Debts.Where(d => d.DebtAmount > 0).DefaultIfEmpty().Min(d => d?.DebtAmount ?? 0) : 0;
+
+        // Update TotalTransactions1 to be inflows + debts - outflows
+        TotalTransactions1 = Debts.Where(d => d.DebtAmount > 0).Sum(d => d.DebtAmount);
+
+        // Available balance calculation considering only inflows, outflows, and pending debt
+        AvailableBalance = TotalInflows - TotalOutflows + PendingDebt;
+        AvailableClass.Balance = AvailableBalance;
+
+        // Calculate total transactions (inflows + debts + outflows)
+        TotalTransactions = Inflows.Count + Debts.Count + Outflows.Count;
+
+        // Calculate net total after considering inflows, outflows, and pending debt
+        NetTotal = TotalInflows - TotalOutflows + PendingDebt;
+    }
+
+
+    private async Task<List<Debt>> LoadDebtsFromJson()
+    {
+        if (System.IO.File.Exists(DebtFilePath))
+        {
+            string jsonString = await System.IO.File.ReadAllTextAsync(DebtFilePath);
+            return System.Text.Json.JsonSerializer.Deserialize<List<Debt>>(jsonString) ?? new List<Debt>();
+        }
+        return new List<Debt>();
+    }
+
+    private async Task<List<Transaction>> LoadTransactionsFromJson(string filePath)
+    {
+        if (System.IO.File.Exists(filePath))
+        {
+            string jsonString = await System.IO.File.ReadAllTextAsync(filePath);
+            return System.Text.Json.JsonSerializer.Deserialize<List<Transaction>>(jsonString) ?? new List<Transaction>();
+        }
+        return new List<Transaction>();
+    }
+
+    // Debt clearing logic update without extra error message
+    private async Task ClearDebt(Debt debt)
+    {
+        // Check if the total inflow can cover the debt
+        decimal totalInflow = await GetTotalCashInflows();
+
+        if (totalInflow >= debt.DebtAmount)
+        {
+            // Only mark debt as cleared
+            debt.DebtAmount = 0;
+            await SaveDebtsToJson();
+        }
+
+        // Recalculate dashboard after debt clearance
+        RecalculateDashboard();
+        StateHasChanged();
+    }
+
+    private async Task SaveDebtsToJson()
+    {
+        string jsonString = System.Text.Json.JsonSerializer.Serialize(Debts, new JsonSerializerOptions { WriteIndented = true });
+        await System.IO.File.WriteAllTextAsync(DebtFilePath, jsonString);
+    }
+
+    // Helper method to get total inflows (updated logic)
+    private async Task<decimal> GetTotalCashInflows()
+    {
+        if (System.IO.File.Exists(InflowFilePath))
+        {
+            string jsonString = await System.IO.File.ReadAllTextAsync(InflowFilePath);
+            var cashInflows = System.Text.Json.JsonSerializer.Deserialize<List<Transaction>>(jsonString) ?? new List<Transaction>();
+            return cashInflows.Sum(inflow => inflow.Amount);
+        }
+        return 0;
+    }
+
+    public class Transaction
+    {
+        public string Title { get; set; }
+        public decimal Amount { get; set; }
+        public DateTime Date { get; set; } = DateTime.Now;
+    }
+
+    public class Debt
+    {
+        public string DebtSource { get; set; }
+        public decimal DebtAmount { get; set; }
+        public DateTime DueDate { get; set; }
+        public string Description { get; set; }
+    }
+
+    private async Task DeleteAccount()
+    {
+        try
+        {
+            // Remove user details from local storage (if any)
+            await LocalStorage.RemoveItemAsync("UserDetails");
+            await LocalStorage.RemoveItemAsync("IsSignedUp");
+
+            // Delete user's data files
+            DeleteFileIfExists(InflowFilePath);
+            DeleteFileIfExists(OutflowFilePath);
+            DeleteFileIfExists(DebtFilePath);
+
+            // Redirect to signup page after account deletion
+            Navigation.NavigateTo("/signup");
+        }
+        catch (Exception ex)
+        {
+            // Log or show error if something goes wrong
+            Console.WriteLine($"Error during account deletion: {ex.Message}");
+        }
+    }
+
+    private void DeleteFileIfExists(string filePath)
+    {
+        if (System.IO.File.Exists(filePath))
+        {
+            System.IO.File.Delete(filePath); // Delete the file
+            Console.WriteLine($"File deleted: {filePath}");
+        }
+        else
+        {
+            Console.WriteLine($"File not found: {filePath}");
+        }
+    }
+}

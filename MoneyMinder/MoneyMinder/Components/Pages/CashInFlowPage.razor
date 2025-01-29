@@ -1,0 +1,281 @@
+﻿@page "/cash-inflow"
+@inject NavigationManager NavigationManager
+@using Newtonsoft.Json
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@using System.Text.Json;
+@using static MoneyMinder.Components.Pages.SignupPage
+<div style="font-family: 'Roboto', sans-serif; background-color: #f5f5f5; padding: 40px; max-width: 1200px; margin: auto; border-radius: 8px;">
+
+    <h2 style="text-align: center; color: #333; font-weight: 600; font-size: 32px; margin-bottom: 30px;">
+        Cash Inflows
+    </h2>
+
+    <!-- Add Inflow Button -->
+    <div style="text-align: center; margin: 20px 0;">
+        <button @onclick="OpenModal"
+                style="padding: 16px 32px; background-color: #007BFF; color: #fff; border: none; border-radius: 50px; font-size: 18px; font-weight: 600; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);">
+            + Add Inflow
+        </button>
+    </div>
+
+    <!-- Modal -->
+    @if (IsModalOpen)
+    {
+        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.3); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+            <div style="background: #fff; padding: 30px 40px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.15);">
+                <h3 style="color: #333; font-weight: 600; text-align: center; font-size: 24px;">
+                    @(selectedTransaction == null ? "Add New Cash Inflow" : "Edit Cash Inflow")
+                </h3>
+                <form @onsubmit="@(selectedTransaction == null ? SaveTransaction : UpdateTransaction)" style="margin-top: 30px;">
+                    <!-- Title Input -->
+                    <div style="margin-bottom: 20px;">
+                        <label for="title" style="font-weight: 500; color: #333; font-size: 16px;">Title</label>
+                        <input id="title" type="text" @bind="NewTransaction.Title" placeholder="Enter title"
+                               style="width: 100%; padding: 14px 18px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px;" required />
+                    </div>
+
+                    <!-- Amount Input -->
+                    <div style="margin-bottom: 20px;">
+                        <label for="amount" style="font-weight: 500; color: #333; font-size: 16px;">Amount</label>
+                        <input id="amount" type="number" @bind="NewTransaction.Amount" placeholder="Enter amount"
+                               style="width: 100%; padding: 14px 18px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px;" required />
+                    </div>
+
+                    <!-- Date Input -->
+                    <div style="margin-bottom: 20px;">
+                        <label for="date" style="font-weight: 500; color: #333; font-size: 16px;">Date</label>
+                        <input id="date" type="date" @bind="NewTransaction.Date"
+                               style="width: 100%; padding: 14px 18px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px;" required />
+                    </div>
+
+                    <!-- Tags Dropdown -->
+                    <div style="margin-bottom: 20px;">
+                        <label for="tag" style="font-weight: 500; color: #333; font-size: 16px;">Tags</label>
+                        <select id="tag" @bind="NewTransaction.Tag"
+                                style="width: 100%; padding: 14px 18px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px;">
+                            <option value="" disabled>Select a tag</option>
+                            @foreach (var tag in Tags)
+                            {
+                                <option value="@tag">@tag</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Custom Tag Input -->
+                    <div style="margin-bottom: 20px;">
+                        <label for="custom-tag" style="font-weight: 500; color: #333; font-size: 16px;">Custom Tag</label>
+                        <input id="custom-tag" type="text" @bind="CustomTag" placeholder="Add a custom tag"
+                               style="width: 100%; padding: 14px 18px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px;" />
+                        <button type="button" @onclick="AddCustomTag"
+                                style="margin-top: 12px; padding: 12px 18px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">
+                            Add Custom Tag
+                        </button>
+                    </div>
+
+                    <!-- Notes -->
+                    <div style="margin-bottom: 20px;">
+                        <label for="notes" style="font-weight: 500; color: #333; font-size: 16px;">Notes</label>
+                        <textarea id="notes" @bind="NewTransaction.Notes" placeholder="Add notes here"
+                                  style="width: 100%; padding: 14px 18px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px;"></textarea>
+                    </div>
+
+                    <!-- Buttons -->
+                    <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+                        <button type="submit"
+                                style="padding: 14px 28px; background: #007BFF; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
+                            Save
+                        </button>
+                        <button type="button" @onclick="CloseModal"
+                                style="padding: 14px 28px; background: #dc3545; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+
+    <!-- Records Table -->
+    <h3 style="color: #333; font-weight: 600; margin-top: 40px; font-size: 24px;">Cash Inflow Records</h3>
+    <table style="width: 100%; border-collapse: collapse; margin-top: 30px; box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);">
+        <thead>
+            <tr style="background: #007BFF; color: white;">
+                <th style="padding: 16px; text-align: left;">Title</th>
+                <th style="padding: 16px; text-align: left;">Amount</th>
+                <th style="padding: 16px; text-align: left;">Date</th>
+                <th style="padding: 16px; text-align: left;">Tag</th>
+                <th style="padding: 16px; text-align: left;">Notes</th>
+                <th style="padding: 16px; text-align: left;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Transactions.Any())
+            {
+                int rowIndex = 0;
+                foreach (var transaction in Transactions)
+                {
+                    var backgroundColor = rowIndex % 2 == 0 ? "#f9f9f9" : "#ffffff";
+                    <tr style="background-color:@backgroundColor; transition: background-color 0.3s;">
+                        <td style="padding: 16px;">@transaction.Title</td>
+                        <td style="padding: 16px;">@UserCurrency@transaction.Amount</td>
+                        <td style="padding: 16px;">@transaction.Date.ToShortDateString()</td>
+                        <td style="padding: 16px;">@transaction.Tag</td>
+                        <td style="padding: 16px;">@transaction.Notes</td>
+                        <td style="padding: 16px;">
+                            <button @onclick="() => EditTransaction(transaction)"
+                                    style="padding: 8px 14px; background: #FF9800; color: white; border: none; border-radius: 50px; cursor: pointer; margin-right: 8px; font-size: 14px;">
+                                Edit
+                            </button>
+                            <button @onclick="() => DeleteTransaction(transaction)"
+                                    style="padding: 8px 14px; background: #dc3545; color: white; border: none; border-radius: 50px; cursor: pointer; font-size: 14px;">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                    rowIndex++;
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 20px; color: #888;">No inflows recorded yet.</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+
+
+@code {
+    private bool IsModalOpen { get; set; } = false;
+    private Transaction NewTransaction { get; set; } = new Transaction();
+    private List<string> Tags { get; set; } = new() { "Yearly", "Food", "Gadgets", "Drinks", "Clothes", "Rent", "Monthly", "Fuel", "Party", "EMI", "Miscellaneous" };
+    private string CustomTag { get; set; } = string.Empty;
+    private List<Transaction> Transactions { get; set; } = new();
+    private Transaction? selectedTransaction { get; set; } = null;
+
+    private string FilePath = Path.Combine(AppContext.BaseDirectory, "cash_inflows.json"); 
+     private string UserCurrency { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserCurrency();
+
+        await LoadFromJsonFile();
+    }
+
+    private async Task LoadFromJsonFile()
+    {
+        if (System.IO.File.Exists(FilePath))
+        {
+            string jsonString = await System.IO.File.ReadAllTextAsync(FilePath);
+            Transactions = JsonConvert.DeserializeObject<List<Transaction>>(jsonString) ?? new();
+        }
+    }
+    private async Task LoadUserCurrency()
+    {
+        var userDetailsJson = await LocalStorage.GetItemAsync<string>("Details");
+        if (!string.IsNullOrEmpty(userDetailsJson))
+        {
+            var userDetails = System.Text.Json.JsonSerializer.Deserialize<UserDetails>(userDetailsJson);
+            UserCurrency = userDetails?.PreferredCurrency ?? "USD";
+        }
+        else
+        {
+            UserCurrency = "USD";  // Default to USD if no details are found
+        }
+    }
+
+    private void OpenModal()
+    {
+        selectedTransaction = null;
+        IsModalOpen = true;
+    }
+
+    private void CloseModal() => IsModalOpen = false;
+
+    private void AddCustomTag()
+    {
+        if (!string.IsNullOrWhiteSpace(CustomTag) && !Tags.Contains(CustomTag))
+        {
+            Tags.Add(CustomTag);
+            CustomTag = string.Empty;
+        }
+    }
+
+    private async Task SaveTransaction()
+    {
+        Transactions.Add(new Transaction
+            {
+                Title = NewTransaction.Title,
+                Amount = NewTransaction.Amount,
+                Tag = NewTransaction.Tag,
+                Notes = NewTransaction.Notes,
+                Date = NewTransaction.Date,
+            });
+        await SaveToJsonFile();
+        CloseModal();
+    }
+
+    private async Task UpdateTransaction()
+    {
+        var index = Transactions.FindIndex(t => t == selectedTransaction);
+        if (index >= 0)
+        {
+            Transactions[index] = new Transaction
+                {
+                    Title = NewTransaction.Title,
+                    Amount = NewTransaction.Amount,
+                    Tag = NewTransaction.Tag,
+                    Notes = NewTransaction.Notes,
+                    Date = NewTransaction.Date,
+                };
+        }
+        await SaveToJsonFile();
+        CloseModal();
+    }
+
+    private void EditTransaction(Transaction transaction)
+    {
+        selectedTransaction = transaction;
+        NewTransaction = new Transaction
+            {
+                Title = transaction.Title,
+                Amount = transaction.Amount,
+                Tag = transaction.Tag,
+                Notes = transaction.Notes,
+                Date = transaction.Date,
+            };
+        IsModalOpen = true;
+    }
+
+    private async Task DeleteTransaction(Transaction transaction)
+    {
+        Transactions.Remove(transaction);
+        await SaveToJsonFile();
+    }
+
+    private async Task SaveToJsonFile()
+    {
+        string jsonString = JsonConvert.SerializeObject(Transactions, Formatting.Indented);
+        await System.IO.File.WriteAllTextAsync(FilePath, jsonString);
+    }
+
+    private void ResetNewTransaction()
+    {
+        NewTransaction = new Transaction();
+    }
+
+    private class Transaction
+    {
+        public string Title { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public string? Tag { get; set; }
+        public string? Notes { get; set; }
+        public DateTime Date { get; set; } = DateTime.Now;
+    }
+}

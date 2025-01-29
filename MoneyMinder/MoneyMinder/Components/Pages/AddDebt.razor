@@ -1,0 +1,385 @@
+﻿@page "/add-debt-source"
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@using System.Text.Json;
+@using static MoneyMinder.Components.Pages.SignupPage
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+
+<div style="font-family: 'Open Sans', sans-serif; background: #f9f9fb; min-height: 100vh; padding: 2rem;">
+    <div style="max-width: 1200px; margin: 0 auto;">
+        <h2 style="text-align: center; color: #000; font-weight: 400; font-size: 2.5rem; margin-bottom: 2rem;">
+            Manage Debt Sources
+        </h2>
+       
+        <section class="summary-cards">
+            <div class="card" style="background: #e0f7fa;">
+                <i class="fas fa-coins"></i>
+                <h3>Total Debt</h3>
+                <p>@UserCurrency @TotalDebt</p>
+            </div>
+            <div class="card" style="background: #ffcdd2;">
+                <i class="fas fa-money-check-alt"></i>
+                <h3>Total Cleared Debt</h3>
+                <p>@UserCurrency @TotalCleared</p>
+            </div>
+        </section>
+        
+
+        <style>
+            .summary-cards {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Ensures responsive layout */
+                gap: 20px; /* Space between cards */
+                margin-bottom: 20px;
+                padding: 10px; /* Adjusts spacing around the grid */
+            }
+
+            .card {
+                background: #ffffff; /* White background for contrast */
+                border-radius: 15px; /* Rounded edges */
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+                padding: 20px; /* Inner spacing for content */
+                text-align: center; /* Centers text and icon */
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                transition: transform 0.3s, box-shadow 0.3s; /* Smooth hover effect */
+            }
+
+                .card:hover {
+                    transform: translateY(-5px); /* Lift effect on hover */
+                    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2); /* Enhanced shadow on hover */
+                }
+
+                .card i {
+                    font-size: 32px; /* Icon size */
+                    margin-bottom: 10px; /* Space below the icon */
+                    color: #00796b; /* Accent color for icons */
+                }
+
+                .card h3 {
+                    font-size: 18px; /* Smaller heading size */
+                    color: #37474f; /* Darker color for text */
+                    margin: 10px 0; /* Spacing around the heading */
+                }
+
+                .card p {
+                    font-size: 16px; /* Text size */
+                    color: #555555; /* Neutral color for balance */
+                }
+        </style>
+
+        <div style="background: white; border-radius: 20px; padding: 2rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
+            <div style="text-align: right; margin-bottom: 2rem;">
+                <button @onclick="OpenModal"
+                        style="padding: 1rem 2rem;
+                       background: linear-gradient(135deg, #FF5733, #FF8C69);
+                       color: white;
+                       border: none;
+                       border-radius: 12px;
+                       font-size: 1rem;
+                       font-weight: 600;
+                       transition: transform 0.2s;
+                       cursor: pointer;
+                       box-shadow: 0 4px 15px rgba(255, 87, 51, 0.2);"
+                        onmouseover="this.style.transform='translateY(-2px)'"
+                        onmouseout="this.style.transform='translateY(0)'">
+                    + Add New Debt
+                </button>
+            </div>
+
+            @if (IsModalOpen)
+            {
+                <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7);
+                    display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(5px);">
+                    <div style="background: white; padding: 2rem; border-radius: 20px; width: 500px;
+                        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); animation: slideDown 0.3s ease-out;">
+                        <h3 style="color: #FF5733; font-weight: 700; text-align: center; font-size: 1.5rem; margin-bottom: 1.5rem;">
+                            Add New Debt Source
+                        </h3>
+
+                        <form @onsubmit="SaveDebtSource">
+                            <div style="margin-bottom: 1.5rem;">
+                                <label style="display: block; font-weight: 600; color: #444; margin-bottom: 0.5rem;">
+                                    Debt Source
+                                </label>
+                                <input type="text" @bind="NewDebt.DebtSource"
+                                       style="width: 100%; padding: 0.75rem; border: 2px solid #eee; border-radius: 10px;
+                                      font-size: 1rem; transition: border-color 0.3s;"
+                                       placeholder="Enter debt source name" />
+                            </div>
+
+                            <div style="margin-bottom: 1.5rem;">
+                                <label style="display: block; font-weight: 600; color: #444; margin-bottom: 0.5rem;">
+                                    Amount
+                                </label>
+                                <input type="number" @bind="NewDebt.DebtAmount"
+                                       style="width: 100%; padding: 0.75rem; border: 2px solid #eee; border-radius: 10px;
+                                      font-size: 1rem; transition: border-color 0.3s;"
+                                       placeholder="Enter amount" />
+                            </div>
+
+                            <div style="margin-bottom: 1.5rem;">
+                                <label style="display: block; font-weight: 600; color: #444; margin-bottom: 0.5rem;">
+                                    Due Date
+                                </label>
+                                <input type="date" @bind="NewDebt.DueDate"
+                                       style="width: 100%; padding: 0.75rem; border: 2px solid #eee; border-radius: 10px;
+                                      font-size: 1rem; transition: border-color 0.3s;" />
+                            </div>
+
+                            <div style="margin-bottom: 1.5rem;">
+                                <label style="display: block; font-weight: 600; color: #444; margin-bottom: 0.5rem;">
+                                    Description
+                                </label>
+                                <textarea @bind="NewDebt.Description"
+                                          style="width: 100%; padding: 0.75rem; border: 2px solid #eee; border-radius: 10px;
+                                         font-size: 1rem; transition: border-color 0.3s; min-height: 100px; resize: vertical;"
+                                          placeholder="Enter description"></textarea>
+                            </div>
+
+                            <div style="display: flex; justify-content: flex-end; gap: 1rem;">
+                                <button type="button" @onclick="CloseModal"
+                                        style="padding: 0.75rem 1.5rem; background: #eee; color: #666; border: none;
+                                       border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                                    Cancel
+                                </button>
+                                <button type="submit"
+                                        style="padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #FF5733, #FF8C69);
+                                       color: white; border: none; border-radius: 10px; font-weight: 600;
+                                       cursor: pointer; transition: all 0.3s;
+                                       box-shadow: 0 4px 15px rgba(255, 87, 51, 0.2);">
+                                    Save Debt
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            }
+
+            @* Existing debts *@
+            @if (Debts.Any())
+            {
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
+                        <thead>
+                            <tr style="background: linear-gradient(135deg, #FF5733, #FF8C69);">
+                                <th style="padding: 1rem; color: white; font-weight: 600; text-align: left; border-radius: 10px 0 0 10px;">Source</th>
+                                <th style="padding: 1rem; color: white; font-weight: 600; text-align: left;">Due Date</th>
+                                <th style="padding: 1rem; color: white; font-weight: 600; text-align: left;">Due Amount</th>
+                                <th style="padding: 1rem; color: white; font-weight: 600; text-align: left;">Status</th>
+                                <th style="padding: 1rem; color: white; font-weight: 600; text-align: right; border-radius: 0 10px 10px 0;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var debt in Debts)
+                            {
+                                <tr style="background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.2s;">
+                                    <td style="padding: 1rem; border-radius: 10px 0 0 10px;">
+                                        <div style="font-weight: 600; color: #333;">@debt.DebtSource</div>
+                                        <div style="color: #666; font-size: 0.9rem;">@debt.Description</div>
+                                    </td>
+                                    <td style="padding: 1rem;">
+                                        <div style="color: #444;">@debt.DueDate.ToString("MMM dd, yyyy")</div>
+                                    </td>
+                                    <td style="padding: 1rem;">
+                                        @if (debt.DebtAmount == 0 && debt.OriginalAmount > 0)
+                                        {
+                                            <div>
+                                                <span style="text-decoration: line-through; color: #666;">
+                                                    @UserCurrency@debt.OriginalAmount
+                                                </span>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div>@UserCurrency@debt.DebtAmount</div>
+                                        }
+                                    </td>
+                                    <td style="padding: 1rem;">
+                                        @if (debt.DebtAmount > 0)
+                                        {
+                                            <span style="background: #FFE5E0; color: #FF5733; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem;">
+                                                Pending
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span style="background: #E0FFF4; color: #00C853; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem;">
+                                                Cleared (@UserCurrency@debt.OriginalAmount)
+                                            </span>
+                                        }
+                                    </td>
+                                    <td style="padding: 1rem; text-align: right; border-radius: 0 10px 10px 0;">
+                                        @if (debt.DebtAmount > 0)
+                                        {
+                                            <button @onclick="() => ClearDebt(debt)"
+                                                    style="padding: 0.75rem 1.5rem; background: #00C853; color: white;
+                                                   border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                                                Clear Debt
+                                            </button>
+                                        }
+                                        <button @onclick="() => DeleteDebt(debt)"
+                                                style="padding: 0.75rem 1.5rem; background: #FF5733; color: white;
+                                               border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                                            Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    <!-- Error Message Display -->
+                    @if (!string.IsNullOrEmpty(ErrorMessage))
+                    {
+                        <div style="margin-top: 1rem; text-align: center;">
+                            <div style="color: white; background-color: #FF5733; padding: 1rem 1.5rem; border-radius: 10px;
+                    font-size: 1rem; font-weight: 600; box-shadow: 0 4px 15px rgba(255, 87, 51, 0.2);">
+                                @ErrorMessage
+                            </div>
+                        </div>
+                    }
+
+                </div>
+            }
+            else
+            {
+                <div style="text-align: center; color: #666; font-size: 1.2rem;">
+                    No debts added yet.
+                </div>
+            }
+        </div>
+        </div>
+</div>
+           
+
+@code {
+    // Properties
+    private string UserCurrency { get; set; } = string.Empty;
+    private bool IsModalOpen { get; set; } = false;
+    private string ErrorMessage { get; set; } = string.Empty;
+
+    private decimal TotalDebt => Debts.Sum(debt => debt.OriginalAmount);
+    private decimal TotalCleared => Debts.Where(debt => debt.OriginalAmount > debt.DebtAmount)
+                                         .Sum(debt => debt.OriginalAmount - debt.DebtAmount);
+
+    private Debt NewDebt { get; set; } = new Debt
+        {
+            DebtSource = string.Empty,
+            DebtAmount = 0,
+            OriginalAmount = 0,
+            DueDate = DateTime.Now,
+            Description = string.Empty
+        };
+
+    private List<Debt> Debts { get; set; } = new List<Debt>();
+    private string DebtFilePath = Path.Combine(AppContext.BaseDirectory, "debts.json");
+
+    // Lifecycle
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserCurrency();
+        Debts = await LoadDebtsFromJson();
+    }
+
+    // Modal Handling
+    private void OpenModal() => IsModalOpen = true;
+    private void CloseModal() => IsModalOpen = false;
+
+    // Currency Loading
+    private async Task LoadUserCurrency()
+    {
+        var userDetailsJson = await LocalStorage.GetItemAsync<string>("Details");
+        if (!string.IsNullOrEmpty(userDetailsJson))
+        {
+            var userDetails = System.Text.Json.JsonSerializer.Deserialize<UserDetails>(userDetailsJson);
+            UserCurrency = userDetails?.PreferredCurrency ?? "USD";
+        }
+        else
+        {
+            UserCurrency = "USD"; // Default currency
+        }
+    }
+
+    // Debt Operations
+    private async Task SaveDebtSource()
+    {
+        NewDebt.OriginalAmount = NewDebt.DebtAmount; // Set original amount when creating
+        Debts.Add(NewDebt);
+        await SaveDebtsToJson();
+
+        // Reset new debt form
+        NewDebt = new Debt
+            {
+                DebtSource = string.Empty,
+                DebtAmount = 0,
+                OriginalAmount = 0,
+                DueDate = DateTime.Now,
+                Description = string.Empty
+            };
+        CloseModal();
+        StateHasChanged();
+    }
+
+    private async Task DeleteDebt(Debt debt)
+    {
+        Debts.Remove(debt);
+        await SaveDebtsToJson();
+        StateHasChanged();
+    }
+
+    private async Task ClearDebt(Debt debt)
+    {
+        if (AvailableClass.Balance >= debt.DebtAmount)
+        {
+            debt.OriginalAmount = debt.DebtAmount; // Store the original amount
+            debt.DebtAmount = 0; // Clear the debt
+            await SaveDebtsToJson();
+            StateHasChanged();
+        }
+        else
+        {
+            ErrorMessage = "Insufficient balance to clear debt!";
+            await ShowErrorMessage();
+        }
+    }
+
+    // Error Handling
+    private async Task ShowErrorMessage()
+    {
+        StateHasChanged(); // Show the error message
+        await Task.Delay(3000); // Wait for 3 seconds
+        ErrorMessage = string.Empty; // Clear the error message
+        StateHasChanged(); // Update UI
+    }
+
+    // File Operations
+    private async Task<List<Debt>> LoadDebtsFromJson()
+    {
+        if (System.IO.File.Exists(DebtFilePath))
+        {
+            string jsonString = await System.IO.File.ReadAllTextAsync(DebtFilePath);
+            return System.Text.Json.JsonSerializer.Deserialize<List<Debt>>(jsonString) ?? new List<Debt>();
+        }
+        return new List<Debt>();
+    }
+
+    private async Task SaveDebtsToJson()
+    {
+        string jsonString = System.Text.Json.JsonSerializer.Serialize(Debts, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        await System.IO.File.WriteAllTextAsync(DebtFilePath, jsonString);
+    }
+
+    // Debt Model
+    public class Debt
+    {
+        public string DebtSource { get; set; } = string.Empty;
+        public decimal DebtAmount { get; set; }
+        public decimal OriginalAmount { get; set; } = 0; // Track original amount
+        public DateTime DueDate { get; set; }
+        public string Description { get; set; } = string.Empty;
+    }
+}
+

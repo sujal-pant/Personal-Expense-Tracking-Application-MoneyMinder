@@ -1,0 +1,313 @@
+﻿@page "/cash-outflow"
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@using System.Text.Json;
+@using static MoneyMinder.Components.Pages.SignupPage
+@inject ITransactionService TransactionService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<div style="font-family: 'Arial', sans-serif; background: #eef2f7; padding: 25px;">
+    <h1 style="text-align: center; color: #2d4059; font-weight: 600;">Cash Outflows Management</h1>
+
+    <div style="display: flex; justify-content: center; margin: 20px 0;">
+        <button @onclick="OpenModal" style="padding: 12px 24px; background: #17a2b8; color: #fff; border: none; border-radius: 5px; font-size: 14px; font-weight: 600; transition: 0.3s; cursor: pointer;">
+            Add New Outflow
+        </button>
+    </div>
+
+    @if (IsModalOpen)
+    {
+        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center;">
+            <div style="background: #fff; width: 500px; border-radius: 10px; padding: 20px; box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.2);">
+                <h2 style="color: #2d4059; font-weight: 600; text-align: center;">
+                    @(selectedTransaction == null ? "Add Outflow" : "Edit Outflow")
+                </h2>
+                @if (!string.IsNullOrEmpty(ErrorMessage))
+                {
+                    <div style="color: #dc3545; font-weight: 600; margin-bottom: 15px; text-align: center;">
+                        @ErrorMessage
+                    </div>
+                }
+                <form @onsubmit="@(selectedTransaction == null ? SaveTransaction : UpdateTransaction)" style="margin-top: 20px;">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: #495057; font-weight: 500;">Title</label>
+                        <input type="text" @bind="NewTransaction.Title" placeholder="Enter title"
+                               style="width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px;" required />
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: #495057; font-weight: 500;">Amount</label>
+                        <input type="number" @bind="NewTransaction.Amount" placeholder="Enter amount"
+                               style="width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px;" required />
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: #495057; font-weight: 500;">Date</label>
+                        <input type="date" @bind="NewTransaction.Date"
+                               style="width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px;" required />
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: #495057; font-weight: 500;">Tags</label>
+                        <select @bind="NewTransaction.Tag" style="width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px;">
+                            <option value="" disabled>Select a tag</option>
+                            @foreach (var tag in Tags)
+                            {
+                                <option value="@tag">@tag</option>
+                            }
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: #495057; font-weight: 500;">Custom Tag</label>
+                        <input type="text" @bind="CustomTag" placeholder="Enter a custom tag"
+                               style="width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px;" />
+                        <button type="button" @onclick="AddCustomTag"
+                                style="margin-top: 10px; padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                            Add Tag
+                        </button>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: #495057; font-weight: 500;">Notes</label>
+                        <textarea @bind="NewTransaction.Notes" placeholder="Enter notes"
+                                  style="width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px;"></textarea>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <button type="submit"
+                                style="flex: 1; margin-right: 5px; padding: 10px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Save
+                        </button>
+                        <button type="button" @onclick="CloseModal"
+                                style="flex: 1; margin-left: 5px; padding: 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+
+    <h3 style="color: #495057; font-weight: 600; margin-top: 20px;">Transaction History</h3>
+    <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+        <thead>
+            <tr style="background: #2d4059; color: #fff;">
+                <th style="padding: 10px; text-align: left;">Title</th>
+                <th style="padding: 10px; text-align: left;">Amount</th>
+                <th style="padding: 10px; text-align: left;">Date</th>
+                <th style="padding: 10px; text-align: left;">Tag</th>
+                <th style="padding: 10px; text-align: left;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Transactions.Any())
+            {
+                int rowIndex = 0;
+                foreach (var transaction in Transactions)
+                {
+                    var backgroundColor = rowIndex % 2 == 0 ? "#f8f9fa" : "#fff";
+                    <tr style="background-color:@backgroundColor;">
+                        <td style="padding: 10px;">@transaction.Title</td>
+                        <td style="padding: 10px;">@UserCurrency@transaction.Amount</td>
+                        <td style="padding: 10px;">@transaction.Date.ToShortDateString()</td>
+                        <td style="padding: 10px;">@transaction.Tag</td>
+                        <td style="padding: 10px;">
+                            <button @onclick="() => EditTransaction(transaction)" style="padding: 6px 10px; background: #ffc107; color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px;">
+                                Edit
+                            </button>
+                            @* <button @onclick="() => DeleteTransaction(transaction)" style="padding: 6px 10px; background: #dc3545; color: #fff; border: none; border-radius: 4px; cursor: pointer;">
+                    Delete
+                    </button> *@
+                        </td>
+                    </tr>
+                    rowIndex++;
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 15px; color: #6c757d;">No transactions recorded.</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    // User's preferred currency
+    private string UserCurrency { get; set; } = string.Empty;
+
+    // Modal state for adding/editing transactions
+    private bool IsModalOpen { get; set; } = false;
+
+    // New transaction to be added or edited
+    private Transaction NewTransaction { get; set; } = new Transaction
+        {
+            Title = "",
+            Type = "Debit",
+            Amount = 0,
+            Date = DateTime.Now,
+            Notes = string.Empty
+        };
+
+    // Predefined list of tags
+    private List<string> Tags { get; set; } = new List<string>
+    {
+        "Food", "Entertainment", "Utilities", "Rent", "Miscellaneous", "Transportation", "Medical", "Shopping"
+    };
+
+    // Custom tag input by the user
+    private string CustomTag { get; set; } = string.Empty;
+
+    // List of transactions
+    private List<Transaction> Transactions { get; set; } = new();
+
+    // Selected transaction for editing
+    private Transaction selectedTransaction { get; set; } = null;
+
+    // Total inflows amount
+    private decimal TotalInflows { get; set; } = 0;
+
+    // Error message for validation
+    private string ErrorMessage { get; set; } = string.Empty;
+
+    // Path to the JSON file for storing transactions
+    private string FilePath = Path.Combine(AppContext.BaseDirectory, "cash_outflows.json");
+
+    // Initialize component and load data
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserCurrency(); // Load user's preferred currency
+        await LoadFromJsonFile(); // Load transactions from file
+        TotalInflows = await GetTotalInflows(); // Calculate total inflows
+    }
+
+    // Load user's preferred currency from local storage
+    private async Task LoadUserCurrency()
+    {
+        var userDetailsJson = await LocalStorage.GetItemAsync<string>("Details");
+        if (!string.IsNullOrEmpty(userDetailsJson))
+        {
+            var userDetails = System.Text.Json.JsonSerializer.Deserialize<UserDetails>(userDetailsJson);
+            UserCurrency = userDetails?.PreferredCurrency ?? "USD";
+        }
+        else
+        {
+            UserCurrency = "USD"; // Default to USD if no details are found
+        }
+    }
+
+    // Load transactions from JSON file
+    private async Task LoadFromJsonFile()
+    {
+        if (System.IO.File.Exists(FilePath))
+        {
+            string jsonString = await System.IO.File.ReadAllTextAsync(FilePath);
+            Transactions = System.Text.Json.JsonSerializer.Deserialize<List<Transaction>>(jsonString) ?? new List<Transaction>();
+        }
+    }
+
+    // Calculate total inflows from inflows JSON file
+    private async Task<decimal> GetTotalInflows()
+    {
+        string inflowFilePath = Path.Combine(AppContext.BaseDirectory, "cash_inflows.json");
+
+        if (System.IO.File.Exists(inflowFilePath))
+        {
+            string jsonString = await System.IO.File.ReadAllTextAsync(inflowFilePath);
+            var inflows = System.Text.Json.JsonSerializer.Deserialize<List<Transaction>>(jsonString) ?? new List<Transaction>();
+            return inflows.Sum(t => t.Amount);
+        }
+        return 0;
+    }
+
+    // Open the modal for adding a new transaction
+    private void OpenModal()
+    {
+        selectedTransaction = null; // Reset selected transaction
+        IsModalOpen = true;
+    }
+
+    // Close the modal
+    private void CloseModal() => IsModalOpen = false;
+
+    // Add a custom tag to the tags list
+    private void AddCustomTag()
+    {
+        if (!string.IsNullOrWhiteSpace(CustomTag) && !Tags.Contains(CustomTag))
+        {
+            Tags.Add(CustomTag);
+            CustomTag = string.Empty;
+        }
+    }
+
+    // Save a new transaction
+    private async Task SaveTransaction()
+    {
+        if (AvailableClass.Balance >= NewTransaction.Amount)
+        {
+            Transactions.Add(NewTransaction); // Add new transaction
+            await SaveToJsonFile(); // Save to JSON file
+            CloseModal();
+            ErrorMessage = ""; // Clear error message
+        }
+        else
+        {
+            decimal currentOutflows = Transactions.Sum(t => t.Amount);
+            if (currentOutflows + NewTransaction.Amount > TotalInflows)
+            {
+                ErrorMessage = "Insufficient funds to withdraw!";
+            }
+        }
+    }
+
+    // Update an existing transaction
+    private async Task UpdateTransaction()
+    {
+        var index = Transactions.FindIndex(t => t == selectedTransaction);
+        if (index != -1)
+        {
+            Transactions[index] = NewTransaction; // Update transaction
+            await SaveToJsonFile(); // Save to JSON file
+            CloseModal();
+        }
+    }
+
+    // Save transactions to JSON file
+    private async Task SaveToJsonFile()
+    {
+        string jsonString = System.Text.Json.JsonSerializer.Serialize(Transactions);
+        await System.IO.File.WriteAllTextAsync(FilePath, jsonString);
+        await LoadFromJsonFile(); // Reload data from file
+    }
+
+    // Edit an existing transaction
+    private void EditTransaction(Transaction transaction)
+    {
+        selectedTransaction = transaction;
+        NewTransaction = transaction; // Pre-fill form with selected transaction
+        IsModalOpen = true;
+    }
+
+    // Show a browser alert with a message
+    private async Task ShowAlert(string message)
+    {
+        await JSRuntime.InvokeVoidAsync("alert", message);
+    }
+
+    // Transaction model
+    public class Transaction
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public string Tag { get; set; } = string.Empty;
+        public DateTime Date { get; set; }
+        public string Notes { get; set; } = string.Empty;
+    }
+
+    // User details model
+    public class UserDetails
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string PreferredCurrency { get; set; } = string.Empty;
+    }
+}

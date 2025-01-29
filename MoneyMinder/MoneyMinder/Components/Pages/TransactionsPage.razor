@@ -1,0 +1,271 @@
+﻿@page "/transactions"
+@inject IJSRuntime JSRuntime
+@using System.Text.Json;
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@using System.Text.Json;
+@using static MoneyMinder.Components.Pages.SignupPage
+<div class="container" style="font-family: 'Roboto', sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px;">
+    <!-- Previous HTML remains the same -->
+
+    <div class="search-container" style="background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); margin-bottom: 30px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+            <div class="search-field">
+                <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 500;">Search Title</label>
+                <input @bind="SearchQuery"
+                       type="text"
+                       placeholder="Enter title to search..."
+                       style="width: 100%; padding: 12px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; transition: all 0.3s;">
+            </div>
+
+            <div class="search-field">
+                <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 500;">Transaction Type</label>
+                <select @bind="FilterType"
+                        style="width: 100%; padding: 12px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; background-color: white;">
+                    <option value="">All Types</option>
+                    <option value="INFLOW">Inflow</option>
+                    <option value="OUTFLOW">Outflow</option>
+                </select>
+            </div>
+
+            <div class="search-field">
+                <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 500;">Tag</label>
+                <select @bind="FilterTag"
+                        style="width: 100%; padding: 12px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; background-color: white;">
+                    <option value="">All Tags</option>
+                    @foreach (var tag in Tags)
+                    {
+                        <option value="@tag">@tag</option>
+                    }
+                </select>
+            </div>
+
+            <div class="search-field">
+                <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 500;">Start Date</label>
+                <input type="date"
+                       @bind="StartDate"
+                       style="width: 100%; padding: 12px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+            </div>
+
+            <div class="search-field">
+                <label style="display: block; margin-bottom: 8px; color: #333; font-weight: 500;">End Date</label>
+                <input type="date"
+                       @bind="EndDate"
+                       style="width: 100%; padding: 12px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 20px;">
+            <button @onclick="FilterTransactions" class="btn btn-primary">
+                <i class="fas fa-search" style="margin-right: 8px;"></i> Search
+            </button>
+            <button @onclick="SortInflowAscending" class="btn btn-secondary">↑ Inflow</button>
+            <button @onclick="SortInflowDescending" class="btn btn-secondary">↓ Inflow</button>
+            <button @onclick="SortOutflowAscending" class="btn btn-secondary">↑ Outflow</button>
+            <button @onclick="SortOutflowDescending" class="btn btn-secondary">↓ Outflow</button>
+            <button @onclick="ClearFilters" class="btn btn-danger">Clear All</button>
+        </div>
+    </div>
+
+    <div class="table-container" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background-color: #1a237e; color: white;">
+                    <th style="padding: 15px; text-align: left; font-weight: 500;">Title</th>
+                    <th style="padding: 15px; text-align: left; font-weight: 500;">Type</th>
+                    <th style="padding: 15px; text-align: left; font-weight: 500;">Amount</th>
+                    <th style="padding: 15px; text-align: left; font-weight: 500;">Tag</th>
+                    <th style="padding: 15px; text-align: left; font-weight: 500;">Date</th>
+                    <th style="padding: 15px; text-align: left; font-weight: 500;">Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (FilteredTransactions.Any())
+                {
+                    foreach (var transaction in FilteredTransactions)
+                    {
+                        <tr style="border-bottom: 1px solid #e0e0e0; transition: background-color 0.2s;">
+                            <td style="padding: 15px;">@(transaction.Title ?? string.Empty)</td>
+                            <td style="padding: 15px;">
+                                <span class="@(transaction.Type == "INFLOW" ? "badge-inflow" : "badge-outflow")">
+                                    @(transaction.Type ?? string.Empty)
+                                </span>
+                            </td>
+                            <td style="padding: 15px;">@UserCurrency@transaction.Amount.ToString("N2")</td>
+                            <td style="padding: 15px;">
+                                <span class="badge-tag">@(transaction.Tag ?? string.Empty)</span>
+                            </td>
+                            <td style="padding: 15px;">@transaction.Date.ToShortDateString()</td>
+                            <td style="padding: 15px;">@(transaction.Notes ?? string.Empty)</td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="6" style="padding: 30px; text-align: center; color: #666;">
+                            No transactions found matching your criteria.
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private string UserCurrency { get; set; } = string.Empty;
+
+    private string SearchQuery { get; set; } = string.Empty;
+    private string FilterType { get; set; } = string.Empty;
+    private string FilterTag { get; set; } = string.Empty;
+    private DateTime? StartDate { get; set; }
+    private DateTime? EndDate { get; set; }
+    private List<Transaction> Transactions { get; set; } = new();
+    private List<Transaction> FilteredTransactions { get; set; } = new();
+    private List<string> Tags => Transactions.Select(t => t.Tag ?? string.Empty).Where(t => !string.IsNullOrEmpty(t)).Distinct().ToList();
+    private string InflowFilePath = Path.Combine(AppContext.BaseDirectory, "cash_inflows.json");
+    private string OutflowFilePath = Path.Combine(AppContext.BaseDirectory, "cash_outflows.json");
+
+    protected override async Task OnInitializedAsync()
+    {
+                 await LoadUserCurrency();
+
+        await LoadTransactions();
+        FilteredTransactions = Transactions;
+    }
+    private async Task LoadUserCurrency()
+    {
+        var userDetailsJson = await LocalStorage.GetItemAsync<string>("Details");
+        if (!string.IsNullOrEmpty(userDetailsJson))
+        {
+            var userDetails = System.Text.Json.JsonSerializer.Deserialize<UserDetails>(userDetailsJson);
+            UserCurrency = userDetails?.PreferredCurrency ?? "USD";
+        }
+        else
+        {
+            UserCurrency = "USD";  // Default to USD if no details are found
+        }
+    }
+
+    private async Task LoadTransactions()
+    {
+        var inflows = await LoadFromFile(InflowFilePath, "INFLOW");
+        var outflows = await LoadFromFile(OutflowFilePath, "OUTFLOW");
+        Transactions = inflows.Concat(outflows).ToList();
+    }
+
+    private async Task<List<Transaction>> LoadFromFile(string filePath, string type)
+    {
+        if (System.IO.File.Exists(filePath))
+        {
+            var jsonString = await System.IO.File.ReadAllTextAsync(filePath);
+            var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+            var data = System.Text.Json.JsonSerializer.Deserialize<List<Transaction>>(jsonString, options) ?? new List<Transaction>();
+            foreach (var transaction in data)
+            {
+                transaction.Type = type;
+                transaction.Notes ??= string.Empty;
+                transaction.Title ??= string.Empty;
+                transaction.Tag ??= string.Empty;
+            }
+            return data;
+        }
+        return new List<Transaction>();
+    }
+
+    private void FilterTransactions()
+    {
+        FilteredTransactions = Transactions
+            .Where(t => string.IsNullOrEmpty(SearchQuery) ||
+                       (t.Title?.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                       (t.Notes?.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase) ?? false))
+            .Where(t => string.IsNullOrEmpty(FilterType) || t.Type == FilterType)
+            .Where(t => string.IsNullOrEmpty(FilterTag) || t.Tag == FilterTag)
+            .Where(t => !StartDate.HasValue || t.Date >= StartDate.Value)
+            .Where(t => !EndDate.HasValue || t.Date <= EndDate.Value)
+            .ToList();
+    }
+
+    private void SortInflowAscending()
+    {
+        FilteredTransactions = FilteredTransactions
+          .Where(t => t.Type == "INFLOW")
+          .OrderBy(t => t.Date)
+          .ToList();
+    }
+
+    private void SortInflowDescending()
+    {
+        FilteredTransactions = FilteredTransactions
+        .Where(t => t.Type == "INFLOW")
+        .OrderByDescending(t => t.Date)
+        .ToList();
+    }
+
+    private void SortOutflowAscending()
+    {
+        FilteredTransactions = FilteredTransactions
+         .Where(t => t.Type == "OUTFLOW")
+         .OrderBy(t => t.Date)
+         .ToList();
+    }
+
+    private void SortOutflowDescending()
+    {
+        FilteredTransactions = FilteredTransactions
+         .Where(t => t.Type == "OUTFLOW")
+         .OrderByDescending(t => t.Date)
+         .ToList();
+    }
+
+    private void ClearFilters()
+    {
+        SearchQuery = string.Empty;
+        FilterType = string.Empty;
+        FilterTag = string.Empty;
+        StartDate = null;
+        EndDate = null;
+        FilteredTransactions = Transactions;
+    }
+
+    public class Transaction
+    {
+        private string? _title;
+        private string? _type;
+        private string? _tag;
+        private string? _notes;
+
+        public string Title
+        {
+            get => _title ?? string.Empty;
+            set => _title = value;
+        }
+
+        public string Type
+        {
+            get => _type ?? string.Empty;
+            set => _type = value;
+        }
+
+        public decimal Amount { get; set; }
+
+        public string Tag
+        {
+            get => _tag ?? string.Empty;
+            set => _tag = value;
+        }
+
+        public DateTime Date { get; set; }
+
+        public string Notes
+        {
+            get => _notes ?? string.Empty;
+            set => _notes = value;
+        }
+    }
+}
